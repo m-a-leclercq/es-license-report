@@ -3,12 +3,6 @@ example_cluster:
   port: 9200
   username: user # Mutually exclusive to api_key, you can use either username/password or API key for authentication
   password: pass # Mandatory if username is provided, ignored if api_key is used. api_key has priority.
-  api_key: null # Optional if you want to use API key authentication instead of username/password. base64 format. 
+  api_key: null # Optional if you want to use API key authentication instead of username/password. base64 format.
   verify_certs: true # Set to false if you want to disable SSL certificate verification (not recommended)
   ca_certs: /path/to/ca.crt #Optional if your certificate is not part of the system certificates
-
-seriousbusiness:
-  host: https://es.seriousbusiness.fr
-  port: 443
-  username: elastic
-  password: changeme

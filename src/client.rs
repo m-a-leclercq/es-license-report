@@ -3,6 +3,7 @@ use std::fs;
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
+use chrono::Utc;
 use reqwest::{Certificate, Client, ClientBuilder};
 use serde::Deserialize;
 
@@ -157,6 +158,7 @@ pub async fn query_cluster(
             max_resource_units: license_resp.license.max_resource_units,
             max_nodes: license_resp.license.max_nodes,
         },
+        report_time: Utc::now(),
     })
 }
 
@@ -165,7 +167,18 @@ pub async fn query_all_clusters(
     clusters: &[ClusterConfig],
     timeout_secs: u64,
 ) -> Vec<Result<ClusterData, ClusterFailed>> {
-    futures::future::join_all(clusters.iter().map(|c| query_cluster(c, timeout_secs))).await
+    let mut set = tokio::task::JoinSet::new();
+    for (i, c) in clusters.iter().enumerate() {
+        let c = c.clone();
+        set.spawn(async move { (i, query_cluster(&c, timeout_secs).await) });
+    }
+    let mut indexed: Vec<(usize, Result<ClusterData, ClusterFailed>)> =
+        Vec::with_capacity(clusters.len());
+    while let Some(Ok(pair)) = set.join_next().await {
+        indexed.push(pair);
+    }
+    indexed.sort_by_key(|(i, _)| *i);
+    indexed.into_iter().map(|(_, r)| r).collect()
 }
 
 fn fail(cluster: &ClusterConfig, message: String) -> ClusterFailed {

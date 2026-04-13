@@ -1,3 +1,5 @@
+use chrono::{DateTime, Utc};
+
 /// Qualifying roles for Platinum license calculation (and fallback platinum node count).
 const PLATINUM_QUALIFYING_ROLES: &[&str] = &[
     "data",
@@ -34,6 +36,8 @@ pub struct ClusterData {
     pub cluster_uuid: String,
     pub nodes: Vec<NodeData>,
     pub license: LicenseMetadata,
+    /// Timestamp recorded immediately after the cluster API response was received.
+    pub report_time: DateTime<Utc>,
 }
 
 /// Per-license-type consumption breakdown for a single cluster.
@@ -42,6 +46,8 @@ pub enum ConsumptionDetail {
     Enterprise {
         /// ERUs consumed: sum of all node RAM in GB / 64, rounded up to 2 decimal places.
         consumed: f64,
+        /// Raw (pre-rounding) ERU value used for accurate multi-cluster `total_consumed` aggregation.
+        consumed_raw: f64,
     },
     Platinum {
         /// Max of qualifying node count vs. ceil(qualifying RAM GB / 64).
@@ -64,6 +70,8 @@ pub struct ClusterConsumption {
     pub detail: ConsumptionDetail,
     /// `true` when some nodes had no memory data in the API response.
     pub is_partial: bool,
+    /// Timestamp recorded immediately after the cluster API response was received.
+    pub report_time: DateTime<Utc>,
 }
 
 /// Calculate license consumption from normalized cluster data.
@@ -73,8 +81,10 @@ pub fn calculate(data: ClusterData) -> ClusterConsumption {
     let detail = match data.license.license_type.as_str() {
         "enterprise" => {
             let total_gb: f64 = data.nodes.iter().filter_map(|n| n.memory_gb).sum();
+            let raw = total_gb / 64.0;
             ConsumptionDetail::Enterprise {
-                consumed: round_up_2_decimals(total_gb / 64.0),
+                consumed: round_up_2_decimals(raw),
+                consumed_raw: raw,
             }
         }
         "platinum" => {
@@ -113,6 +123,7 @@ pub fn calculate(data: ClusterData) -> ClusterConsumption {
         license: data.license,
         detail,
         is_partial,
+        report_time: data.report_time,
     }
 }
 
@@ -126,6 +137,12 @@ fn is_qualifying(node: &NodeData) -> bool {
 /// e.g. 1.5625 → 1.57, 2.0 → 2.00, 0.001 → 0.01
 fn round_up_2_decimals(x: f64) -> f64 {
     (x * 100.0).ceil() / 100.0
+}
+
+/// Public re-export for use in tests across modules.
+#[cfg(test)]
+pub fn round_up_2_decimals_pub(x: f64) -> f64 {
+    round_up_2_decimals(x)
 }
 
 #[cfg(test)]
@@ -144,6 +161,7 @@ mod tests {
                 max_resource_units: Some(24),
                 max_nodes: Some(12),
             },
+            report_time: DateTime::<Utc>::UNIX_EPOCH,
         }
     }
 
@@ -164,7 +182,7 @@ mod tests {
             vec![node(&["master", "data"], Some(64.0)), node(&["data"], Some(64.0))],
         );
         let result = calculate(data);
-        assert!(matches!(result.detail, ConsumptionDetail::Enterprise { consumed } if consumed == 2.0));
+        assert!(matches!(result.detail, ConsumptionDetail::Enterprise { consumed, .. } if consumed == 2.0));
     }
 
     #[test]
@@ -172,7 +190,7 @@ mod tests {
         // 100 GB / 64 = 1.5625 → round up to 2 decimals → 1.57
         let data = make_data("enterprise", vec![node(&["data"], Some(100.0))]);
         let result = calculate(data);
-        assert!(matches!(result.detail, ConsumptionDetail::Enterprise { consumed } if (consumed - 1.57).abs() < 1e-10));
+        assert!(matches!(result.detail, ConsumptionDetail::Enterprise { consumed, .. } if (consumed - 1.57).abs() < 1e-10));
     }
 
     #[test]
@@ -180,14 +198,14 @@ mod tests {
         // 64.001 GB / 64 = 1.0000156... → ceil at 2 dec → 1.01
         let data = make_data("enterprise", vec![node(&["data"], Some(64.001))]);
         let result = calculate(data);
-        assert!(matches!(result.detail, ConsumptionDetail::Enterprise { consumed } if (consumed - 1.01).abs() < 1e-10));
+        assert!(matches!(result.detail, ConsumptionDetail::Enterprise { consumed, .. } if (consumed - 1.01).abs() < 1e-10));
     }
 
     #[test]
     fn enterprise_zero_ram() {
         let data = make_data("enterprise", vec![node(&["data"], Some(0.0))]);
         let result = calculate(data);
-        assert!(matches!(result.detail, ConsumptionDetail::Enterprise { consumed } if consumed == 0.0));
+        assert!(matches!(result.detail, ConsumptionDetail::Enterprise { consumed, .. } if consumed == 0.0));
     }
 
     // Platinum tests
@@ -259,7 +277,7 @@ mod tests {
         let result = calculate(data);
         assert!(result.is_partial);
         // Only 64 GB counted → 64/64 = 1.00
-        assert!(matches!(result.detail, ConsumptionDetail::Enterprise { consumed } if consumed == 1.0));
+        assert!(matches!(result.detail, ConsumptionDetail::Enterprise { consumed, .. } if consumed == 1.0));
     }
 
     // Fallback / basic tests

@@ -1,4 +1,4 @@
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Output YAML license consumption report
 The CLI SHALL produce a YAML report summarising license consumption. The report SHALL contain a top-level `licenses` list. Each list item SHALL represent one Elasticsearch `license.uid`, include the license metadata, include the applicable licensed-capacity field when present, include a `total_consumed` field, and contain a `clusters` list describing the relevant consumption metrics for each contributing cluster. Each cluster entry SHALL include a `report_time` field containing the ISO 8601 UTC timestamp of when that cluster's API was queried.
@@ -126,13 +126,6 @@ When the resolved output file already exists, is NOT a valid report, and stdin i
 - **WHEN** the output file exists, is not a valid report, and stdin is not a TTY
 - **THEN** the CLI overwrites the existing file silently without prompting
 
-### Requirement: basic license entry omits total_consumed
-For clusters whose `license.type` is `basic` or any other unsupported type, no single `consumed` value is defined, so the license entry SHALL omit the `total_consumed` field.
-
-#### Scenario: Basic license entry has no total_consumed
-- **WHEN** a license entry has `type: basic`
-- **THEN** the `total_consumed` field is absent from that license entry
-
 ### Requirement: Exit code reflects overall success
 The CLI SHALL exit with code 0 when at least one cluster was queried successfully. It SHALL exit with a non-zero code when all clusters failed or a fatal configuration error occurred.
 
@@ -143,3 +136,12 @@ The CLI SHALL exit with code 0 when at least one cluster was queried successfull
 #### Scenario: Partial success
 - **WHEN** at least one cluster was queried successfully and at least one failed
 - **THEN** the CLI exits with code 0 and includes errors in the report
+
+## ADDED Requirements
+
+### Requirement: basic license entry omits total_consumed
+For clusters whose `license.type` is `basic` or any other unsupported type, no single `consumed` value is defined, so the license entry SHALL omit the `total_consumed` field.
+
+#### Scenario: Basic license entry has no total_consumed
+- **WHEN** a license entry has `type: basic`
+- **THEN** the `total_consumed` field is absent from that license entry

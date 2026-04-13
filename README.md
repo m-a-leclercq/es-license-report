@@ -22,16 +22,32 @@ cp target/release/es-license-consumption /usr/local/bin/
 ## Usage
 
 ```
-es-license-consumption --config <path> [--output <path>] [--timeout <secs>]
+es-license-consumption [-c <path>] [-o <path>] [-t <secs>] [-u]
 ```
+
+All flags are optional. When run with no arguments the tool looks for `cluster.yml` in the current directory and writes its report to `report.yml`.
 
 ### CLI flags
 
-| Flag | Required | Default | Description |
-|------|----------|---------|-------------|
-| `--config <path>` | yes | — | Path to the cluster YAML configuration file |
-| `--output <path>` | no | stdout | Write the YAML report to this file |
-| `--timeout <secs>` | no | 20 | Per-cluster HTTP request timeout in seconds |
+| Flag | Short | Required | Default | Description |
+|------|-------|----------|---------|-------------|
+| `--config <path>` | `-c` | no | `cluster.yml` | Path to the cluster YAML configuration file |
+| `--output <path>` | `-o` | no | `report.yml` | Write the YAML report to this file |
+| `--timeout <secs>` | `-t` | no | 20 | Per-cluster HTTP request timeout in seconds |
+| `--update` | `-u` | no | — | Non-interactive update: silently merge fresh data into an existing report |
+
+When `--config` is omitted and `cluster.yml` does not exist, the CLI exits with a descriptive error.
+
+When `--output` is omitted, a notice is printed to stderr: `Writing report to report.yml`.
+
+### Update mode
+
+When the resolved output file already exists and is a valid report, the CLI enters **update mode** instead of overwriting it:
+
+- **Interactive (stdin is a TTY):** a prompt offers `(u) update` or `(a) write to another file`. Choosing update triggers a per-cluster merge: for each cluster whose existing `report_time` is older than the freshly collected value, you are prompted to `(u)` update, `(s)` skip, `(a)` update all, or `(k)` skip all.
+- **Non-interactive / `--update` flag:** all stale clusters are silently updated, new clusters are appended, and clusters absent from the fresh report are retained.
+
+If the output file exists but cannot be parsed as a valid report, the CLI falls back to an overwrite/alternate-file prompt.
 
 ### Exit codes
 
@@ -95,22 +111,27 @@ licenses:
     uid: "123e4567-e89b-12d3-a456-426614174000"
     type: enterprise
     max_resource_units: 24
+    total_consumed: 12
     clusters:
       - cluster_name: prod-cluster-1
         cluster_uid: 8d4f4efb-57de-4b4b-a8be-f1cbe2f7af63
-        consumed: 8.0
+        consumed: 8.00
+        report_time: "2026-04-01T10:00:00Z"
       - cluster_name: prod-cluster-2
         cluster_uid: f5bc692a-7a10-43af-9162-bf7ac28d2ce1
-        consumed: 4.0
+        consumed: 4.00
+        report_time: "2026-04-01T10:00:05Z"
   - name: "Example Platinum"
     uid: "523e4567-e89b-12d3-a456-426614174999"
     type: platinum
     max_nodes: 12
+    total_consumed: 7
     clusters:
       - cluster_name: prod-cluster-3
         cluster_uid: a1132481-7f64-44ea-a84a-d83f2f4c3341
         consumed: 7
-        reason: Total RAM used
+        reason: "Total RAM used"
+        report_time: "2026-04-01T10:00:02Z"
   - name: "Example Basic"
     uid: "623e4567-e89b-12d3-a456-426614174888"
     type: basic
@@ -119,6 +140,7 @@ licenses:
         cluster_uid: e463dc1b-4396-42e6-b2dc-3d29a0dd2f93
         number_of_platinum_nodes: 3
         number_of_enterprise_resource_units: 1.57
+        report_time: "2026-04-01T10:00:08Z"
 errors:
   - cluster: broken-cluster
     message: "connection refused"
