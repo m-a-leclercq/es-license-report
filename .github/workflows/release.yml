@@ -16,16 +16,16 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            bin: rust-diags
-            asset: rust-diags-linux-x86_64
+            bin: es-license-consumption
+            asset: es-license-consumption-linux-x86_64
           - os: macos-latest
             target: aarch64-apple-darwin
-            bin: rust-diags
-            asset: rust-diags-macos-aarch64
+            bin: es-license-consumption
+            asset: es-license-consumption-macos-aarch64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            bin: rust-diags.exe
-            asset: rust-diags-windows-x86_64.exe
+            bin: es-license-consumption.exe
+            asset: es-license-consumption-windows-x86_64.exe
 
     steps:
       - uses: actions/checkout@v4
