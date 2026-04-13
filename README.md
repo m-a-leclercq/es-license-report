@@ -2,6 +2,8 @@
 
 A command-line tool that queries one or more Elasticsearch clusters, calculates license consumption based on node RAM and roles, and emits a consolidated YAML report.
 
+**Disclaimer:** This tool is a personal project developed by me in my individual capacity. It is not an official Elastic product, and it is neither supported nor endorsed by Elastic NV. Use of this tool is at your own risk and does not constitute official licensing advice.
+
 ## Installation
 
 ### From source
